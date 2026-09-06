@@ -389,7 +389,7 @@ footer a{color:var(--ink-muted);}
     </div>
     <div class="panel">
       <h2>Dendroloogid</h2>
-      <div class="desc">Hindaja (dendroloog) otsuste arvu järgi. raie.tallinn.ee ei avalda praegu, kes otsuse hindas &mdash; valmidus väljale on olemas, kuid allolevad nimed on hetkel <strong>fiktiivsed demoandmed</strong>, mis asendatakse päris andmetega, kui andmebaasi haldaja lisab dendroloogi välja lähteandmetesse. Klõpsa nimel, et näha sellega seotud otsuseid.</div>
+      <div class="desc">Hindaja (dendroloog) otsuste arvu järgi. raie.tallinn.ee ei avalda praegu, kes otsuse hindas &mdash; valmidus väljale on olemas, aga seni andmeid pole. Kui allikas selle info tulevikus avalikustab, ilmub edetabel siia automaatselt.</div>
       <div class="rank-list" id="boardDendro"><div class="empty-note">Andmed laaditakse&hellip;</div></div>
       <div id="dendroDetail" style="margin-top:12px;"></div>
     </div>
@@ -470,10 +470,10 @@ footer a{color:var(--ink-muted);}
       <div class="table-scroll">
         <table class="permit-table">
           <thead>
-            <tr><th>Aadress</th><th>Puud</th><th>Väärtusklass</th><th>Põhjus</th><th>Otsus</th><th>Kuupäev</th><th>Lingid</th></tr>
+            <tr><th>Aadress</th><th>Puud</th><th>Põhjus</th><th>Otsus</th><th>Kuupäev</th><th>Lingid</th></tr>
           </thead>
           <tbody id="permitBody">
-            <tr><td colspan="7" class="empty-note">Andmed laaditakse&hellip;</td></tr>
+            <tr><td colspan="6" class="empty-note">Andmed laaditakse&hellip;</td></tr>
           </tbody>
         </table>
       </div>
@@ -547,7 +547,25 @@ footer a{color:var(--ink-muted);}
   <div class="view" id="view-map">
     <div class="panel">
       <h2>Kaart</h2>
-      <div class="desc">Raielubade asukohad Tallinna aerofotol valitud ajavahemikus. Punane täpp = väärtusklass V, kollane = IV, roheline = I&ndash;III. Hoia hiirekursorit täpil, et näha puuliiki ja põhjust; klõpsa täpil, et avada see koht Google Street View&#39;s.</div>
+      <div class="desc">Raielubade asukohad Tallinna aerofotol, filtreeritavad samade tingimustega mis Load vaates. Hoia hiirekursorit täpil, et näha puuliiki ja põhjust; klõpsa täpil, et avada see koht Google Mapsis / Street View&#39;s.</div>
+      <div class="filters">
+        <div class="field">
+          <label>Puuliik</label>
+          <div id="mSpecies" class="ms-dropdown"></div>
+        </div>
+        <div class="field">
+          <label>Põhjus</label>
+          <div id="mReason" class="ms-dropdown"></div>
+        </div>
+        <div class="field">
+          <label>Linnaosa</label>
+          <div id="mDistrict" class="ms-dropdown"></div>
+        </div>
+        <div class="field">
+          <label for="mDiam">Läbimõõt alates (cm)</label>
+          <input type="number" id="mDiam" min="0" placeholder="nt 30">
+        </div>
+      </div>
       <div class="filters" style="align-items:flex-end;">
         <div class="field">
           <label for="mapFrom">Otsuse kuupäev alates</label>
@@ -558,6 +576,9 @@ footer a{color:var(--ink-muted);}
           <input type="date" id="mapTo">
         </div>
         <div class="preset-row" id="mapPresetRow" style="margin-top:0;align-self:center;"></div>
+        <div class="field" style="align-self:center;">
+          <button type="button" id="mSearchBtn" class="preset-chip">Otsi / uuenda kaarti</button>
+        </div>
       </div>
       <div class="map-wrap" id="mapWrap">
         <div class="map-zoom-controls">
@@ -572,9 +593,7 @@ footer a{color:var(--ink-muted);}
         <div class="map-tooltip" id="mapTooltip" hidden></div>
       </div>
       <div class="map-legend">
-        <span class="legend-item"><span class="dot dot-green"></span> Väärtusklass I&ndash;III</span>
-        <span class="legend-item"><span class="dot dot-yellow"></span> Väärtusklass IV</span>
-        <span class="legend-item"><span class="dot dot-red"></span> Väärtusklass V</span>
+        <span class="legend-item"><span class="dot dot-green"></span> Raieluba (klõpsa täpil asukoha avamiseks)</span>
       </div>
       <div class="hint" id="mapNote"></div>
       <div class="hint" style="margin-top:10px;">Kaardi aluspilt on aerofoto hetktõmmis (uuendatakse andmete värskendamisel) &mdash; platvormi turvapiirangute tõttu ei saa siia sisse ehitada otse Google Mapsi live-vidinat, mistõttu kasutame samaväärset lahendust: aerofoto peal kuvatavad täpid, mis avavad klõpsates päris Google Street View&#39;i.</div>
@@ -590,7 +609,7 @@ footer a{color:var(--ink-muted);}
         <p>Aadresside geokodeerimine (kaardi- ja Google Street View lingid) toimub Maa-ameti tasuta avaliku aadressiteenuse (In-ADS) kaudu.</p>
         <p>Loa <strong>taotleja</strong> nime register avalikult ei näita &mdash; seda välja hoitakse andmestruktuuris tühjana. Loa <strong>väljaandja</strong> on otsuse teinud linnaosa valitsus.</p>
         <p>Andmed uuenevad ajastatult; viimase uuenduse aeg on kirjas ülal paremas nurgas.</p>
-        <p><strong>Dendroloog</strong> ja puu <strong>väärtusklass</strong> (I&ndash;V) on väljad, mida raie.tallinn.ee praegu avalikult ei näita. Nende jaoks on rakenduses valmidus olemas (Edetabelis, Load vaates ja Kaardil), kuid kuvatavad väärtused on hetkel fiktiivsed demoandmed ning asendatakse päris andmetega, kui andmebaasi haldaja need lähteandmetesse lisab.</p>
+        <p><strong>Dendroloog</strong> ja puu <strong>väärtusklass</strong> (I&ndash;V) on väljad, mida raie.tallinn.ee praegu avalikult ei näita &mdash; seetõttu jäävad need rakenduses tühjaks (mitte fiktiivsete näidisandmetega). Kui allikas need väljad kunagi avalikustab, hakkab rakendus neid automaatselt kuvama.</p>
         <p>Kaart kuvab aerofoto hetktõmmise (Esri/ArcGIS World Imagery), millele on lisatud raielubade asukohad. See uuendatakse andmete värskendamisel; klõpsates täpil avaneb sama koha reaalne Google Street View.</p>
         <p><strong>Ajalugu:</strong> Load vaates saab otsuse kuupäeva järgi filtreerida tagasiulatuvalt kuni 2020. aasta alguseni (kokku ligi 18 700 otsust). Need vanemad otsused pärinevad raie.tallinn.ee nimekirjavaatest ning ei sisalda täpseid GPS-koordinaate ega puu läbimõõtu &ndash; seetõttu ei kuvata neid Kaardil ega raadiuse-otsingus, küll aga on igaühe juures link algsele otsusele.</p>
       </div>
@@ -866,14 +885,6 @@ function fmtDate(s){ return s || '—'; }
 let PERMITS = [];
 let ARCHIVE_PERMITS = [];
 let LEADERBOARD = {issuers:{}, species:{}, reasons:{}, dendrologists:{ready:false, entries:[]}};
-function valueClassBadge(vc){
-  return vc ? `<span class="vclass-badge vclass-${vc}">${vc}</span>` : '<span class="empty-note" style="padding:0;">&mdash;</span>';
-}
-function valueClassDot(vc){
-  if(vc==='V') return 'dot-red';
-  if(vc==='IV') return 'dot-yellow';
-  return 'dot-green';
-}
 let SYNC_STATE = null;
 
 function renderBoard(){
@@ -946,7 +957,7 @@ function renderPermits(){
 
   const tbody = document.getElementById('permitBody');
   if(rows.length===0){
-    tbody.innerHTML = '<tr><td colspan="7" class="empty-note">Ühtegi luba ei vasta valitud tingimustele.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-note">Ühtegi luba ei vasta valitud tingimustele.</td></tr>';
     return;
   }
   tbody.innerHTML = rows.slice(0,150).map(p=>{
@@ -959,7 +970,6 @@ function renderPermits(){
     return `<tr>
       <td><div class="addr">${p.address||'—'}</div><span class="district-pill">${p.district||'—'}</span></td>
       <td>${treeChips}</td>
-      <td>${valueClassBadge(p.valueClass)}</td>
       <td><span class="reason-tag">${reasonTxt||'—'}</span></td>
       <td>${p.decision||'—'}</td>
       <td class="date-cell">${fmtDate(p.decidedAt)}${p.validUntil?`<br>kuni ${fmtDate(p.validUntil)}`:''}</td>
@@ -968,7 +978,7 @@ function renderPermits(){
         <div class="linkrow">${geoBtn}</div>
       </td>
     </tr>`;
-  }).join('') + (rows.length>150 ? `<tr><td colspan="7" class="empty-note">Näidatakse esimesed 150 tulemust ${rows.length}-st. Täpsusta otsingut (linnaosa, puuliik, kuupäevad), et kitsendada.</td></tr>` : '');
+  }).join('') + (rows.length>150 ? `<tr><td colspan="6" class="empty-note">Näidatakse esimesed 150 tulemust ${rows.length}-st. Täpsusta otsingut (linnaosa, puuliik, kuupäevad), et kitsendada.</td></tr>` : '');
 }
 
 function renderDendro(){
@@ -996,13 +1006,13 @@ document.getElementById('boardDendro').addEventListener('click', (e)=>{
     detail.innerHTML = `<div class="desc" style="margin-bottom:8px;"><strong>${name}</strong> &mdash; ${list.length} otsust (demoandmed):</div>` +
       '<div class="sub-list">' + list.slice(0,20).map(p=>`
         <div class="sub-row">
-          <div class="meta">${p.address||'—'} &middot; väärtusklass ${p.valueClass||'—'} &middot; ${p.decidedAt||''}</div>
+          <div class="meta">${p.address||'—'} &middot; ${p.decidedAt||''}</div>
           ${p.detailUrl?`<a href="${p.detailUrl}" target="_blank" rel="noopener">Otsus ${p.loaNr}</a>`:''}
         </div>`).join('') + '</div>';
   }
 });
 
-// ---- Kaart: aerofoto + väärtusklassi järgi värvitud täpid ----
+// ---- Kaart: aerofoto + raielubade asukohatäpid ----
 const MAP_BBOX = {minLon:24.55, maxLon:24.92, minLat:59.35, maxLat:59.50};
 function mercY(latDeg){ const r = latDeg*Math.PI/180; return Math.log(Math.tan(Math.PI/4 + r/2)); }
 const MERC_TOP = mercY(MAP_BBOX.maxLat), MERC_BOTTOM = mercY(MAP_BBOX.minLat);
@@ -1131,26 +1141,43 @@ function renderMap(){
   if(!wrap) return;
   const from = document.getElementById('mapFrom').value;
   const to = document.getElementById('mapTo').value;
+  const species = selectedValues(document.getElementById('mSpecies'));
+  const reasons = selectedValues(document.getElementById('mReason'));
+  const districts = selectedValues(document.getElementById('mDistrict'));
+  const minDiam = parseFloat(document.getElementById('mDiam').value)||0;
   const note = document.getElementById('mapNote');
-  let shown = 0, skippedNoGeo = 0, skippedOutOfRange = 0, skippedOffMap = 0;
+  let shown = 0, skippedNoGeo = 0, skippedOutOfRange = 0, skippedOffMap = 0, skippedFilter = 0;
   wrap.innerHTML = '';
   mapPinData = [];
   const tip = document.getElementById('mapTooltip');
-  PERMITS.forEach(p=>{
+  const seenLoaNr = new Set(PERMITS.map(p=>p.loaNr));
+  const source = ARCHIVE_PERMITS.length ? PERMITS.concat(ARCHIVE_PERMITS.filter(p=>!seenLoaNr.has(p.loaNr))) : PERMITS;
+  source.forEach(p=>{
     if(p.lat==null || p.lng==null){ skippedNoGeo++; return; }
     if(from && p.decidedAt && p.decidedAt < from){ skippedOutOfRange++; return; }
     if(to && p.decidedAt && p.decidedAt > to){ skippedOutOfRange++; return; }
+    if(districts.length && !districts.includes(p.district)){ skippedFilter++; return; }
+    const hasTrees = p.trees && p.trees.length;
+    const speciesList = hasTrees ? p.trees.map(t=>t.species) : (p.species||[]);
+    const reasonList = hasTrees ? p.trees.map(t=>t.reason) : (p.permitTypes||[]);
+    if(species.length && !speciesList.some(s=>species.includes(s))){ skippedFilter++; return; }
+    if(reasons.length && !reasonList.some(r=>reasons.includes(r))){ skippedFilter++; return; }
+    if(minDiam){
+      if(hasTrees){
+        if(!p.trees.some(t=>(t.diameterCm||0)>=minDiam)){ skippedFilter++; return; }
+      } else if(p.maxDiameterCm!=null && p.maxDiameterCm < minDiam){ skippedFilter++; return; }
+    }
     const {x,y} = latLngToPct(p.lat, p.lng);
     if(x<0||x>100||y<0||y>100){ skippedOffMap++; return; }
     const dot = document.createElement('button');
     dot.type = 'button';
-    dot.className = 'map-pin ' + valueClassDot(p.valueClass);
+    dot.className = 'map-pin dot-green';
     dot.style.left = x+'%'; dot.style.top = y+'%';
     dot.style.transform = `translate(-50%,-50%) scale(${1/mapZoom})`;
-    const species = (p.trees && p.trees[0] && p.trees[0].species) || (p.species||[])[0] || '—';
-    const reason = (p.trees && p.trees[0] && p.trees[0].reason) || (p.permitTypes||[])[0] || '—';
+    const sp = (p.trees && p.trees[0] && p.trees[0].species) || (p.species||[])[0] || '—';
+    const rs = (p.trees && p.trees[0] && p.trees[0].reason) || (p.permitTypes||[])[0] || '—';
     dot.addEventListener('mouseenter', ()=>{
-      tip.innerHTML = `<strong>${p.address||'—'}</strong><br>${species}${p.valueClass?` &middot; väärtusklass ${p.valueClass}`:''}<br>${reason}`;
+      tip.innerHTML = `<strong>${p.address||'—'}</strong><br>${sp}<br>${rs}`;
       const {x:px, y:py} = mapPctToScreenPx(x, y);
       tip.style.left = px+'px'; tip.style.top = py+'px';
       tip.hidden = false;
@@ -1166,9 +1193,14 @@ function renderMap(){
   });
   const bits = [`Kaardil ${shown} luba`];
   if(skippedOutOfRange) bits.push(`${skippedOutOfRange} jääb valitud ajavahemikust välja`);
-  if(skippedNoGeo) bits.push(`${skippedNoGeo} ilma täpse aadressita`);
+  if(skippedFilter) bits.push(`${skippedFilter} ei vasta valitud filtritele`);
+  if(skippedNoGeo) bits.push(`${skippedNoGeo} ilma täpse aadressita (geo-andmeta)`);
   note.textContent = bits.join(', ') + '. Suumi hiirerattaga või +/- nuppudega, lohista kaardi liigutamiseks.';
 }
+fillMultiSelect(document.getElementById('mSpecies'), SPECIES_LIST, 'Puuliik');
+fillMultiSelect(document.getElementById('mReason'), REASON_LIST, 'Põhjus');
+fillMultiSelect(document.getElementById('mDistrict'), DISTRICTS, 'Linnaosa');
+document.getElementById('mSearchBtn').addEventListener('click', renderMap);
 document.getElementById('mapFrom').addEventListener('change', renderMap);
 document.getElementById('mapTo').addEventListener('change', renderMap);
 document.getElementById('mapPresetRow').innerHTML = ['30 päeva','90 päeva','Kõik'].map(l=>`<button type="button" class="preset-chip" data-preset="${l}">${l}</button>`).join('');
@@ -1204,7 +1236,7 @@ function renderSyncPill(){
   try{ db = FIRESTORE_DB; }catch(e){ db = null; }
   if(!db){
     document.getElementById('syncText').textContent = 'Andmebaas pole hetkel kättesaadav';
-    document.getElementById('permitBody').innerHTML = '<tr><td colspan="7" class="empty-note">Andmebaas pole hetkel kättesaadav. Proovi lehte hiljem uuesti värskendada.</td></tr>';
+    document.getElementById('permitBody').innerHTML = '<tr><td colspan="6" class="empty-note">Andmebaas pole hetkel kättesaadav. Proovi lehte hiljem uuesti värskendada.</td></tr>';
     return;
   }
 
