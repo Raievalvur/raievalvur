@@ -1287,13 +1287,21 @@ function renderSyncPill(){
           decidedAt: r.decidedAt,
           validUntil: r.validUntil,
           detailUrl: r.detailUrl,
-          lat: null, lng: null,
+          lat: r.lat!=null ? r.lat : null,
+          lng: r.lng!=null ? r.lng : null,
+          valueClass: r.valueClass || null,
           archived: true
         });
       });
     });
     ARCHIVE_PERMITS = recs;
-    renderPermits();
+    ARCHIVE_PERMITS.forEach(p=>{
+      if(p.lat!=null && p.lng!=null && p.address){
+        LOCATION_INDEX[`${p.address}, ${p.district}`] = [p.lat, p.lng];
+      }
+    });
+    rebuildLocationOptions();
+    renderPermits(); renderMap();
   }).catch(err=>{ console.error('permits_archive', err); });
 
   db.doc('leaderboard/issuers').onSnapshot(s=>{ LEADERBOARD.issuers = (s.data()||{}).counts || {}; renderBoard(); });
