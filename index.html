@@ -470,10 +470,10 @@ footer a{color:var(--ink-muted);}
       <div class="table-scroll">
         <table class="permit-table">
           <thead>
-            <tr><th>Aadress</th><th>Puud</th><th>Põhjus</th><th>Otsus</th><th>Kuupäev</th><th>Lingid</th></tr>
+            <tr><th>Aadress</th><th>Puud</th><th>Põhjus</th><th>Väärtusklass</th><th>Otsus</th><th>Kuupäev</th><th>Lingid</th></tr>
           </thead>
           <tbody id="permitBody">
-            <tr><td colspan="6" class="empty-note">Andmed laaditakse&hellip;</td></tr>
+            <tr><td colspan="7" class="empty-note">Andmed laaditakse&hellip;</td></tr>
           </tbody>
         </table>
       </div>
@@ -593,7 +593,9 @@ footer a{color:var(--ink-muted);}
         <div class="map-tooltip" id="mapTooltip" hidden></div>
       </div>
       <div class="map-legend">
-        <span class="legend-item"><span class="dot dot-green"></span> Raieluba (klõpsa täpil asukoha avamiseks)</span>
+        <span class="legend-item"><span class="dot dot-green"></span> I&ndash;III väärtusklass / teadmata</span>
+        <span class="legend-item"><span class="dot dot-yellow"></span> IV väärtusklass</span>
+        <span class="legend-item"><span class="dot dot-red"></span> V väärtusklass (likvideeritav)</span>
       </div>
       <div class="hint" id="mapNote"></div>
       <div class="hint" style="margin-top:10px;">Kaardi aluspilt on aerofoto hetktõmmis (uuendatakse andmete värskendamisel) &mdash; platvormi turvapiirangute tõttu ei saa siia sisse ehitada otse Google Mapsi live-vidinat, mistõttu kasutame samaväärset lahendust: aerofoto peal kuvatavad täpid, mis avavad klõpsates päris Google Street View&#39;i.</div>
@@ -609,9 +611,9 @@ footer a{color:var(--ink-muted);}
         <p>Aadresside geokodeerimine (kaardi- ja Google Street View lingid) toimub Maa-ameti tasuta avaliku aadressiteenuse (In-ADS) kaudu.</p>
         <p>Loa <strong>taotleja</strong> nime register avalikult ei näita &mdash; seda välja hoitakse andmestruktuuris tühjana. Loa <strong>väljaandja</strong> on otsuse teinud linnaosa valitsus.</p>
         <p>Andmed uuenevad ajastatult; viimase uuenduse aeg on kirjas ülal paremas nurgas.</p>
-        <p><strong>Dendroloog</strong> ja puu <strong>väärtusklass</strong> (I&ndash;V) on väljad, mida raie.tallinn.ee praegu avalikult ei näita &mdash; seetõttu jäävad need rakenduses tühjaks (mitte fiktiivsete näidisandmetega). Kui allikas need väljad kunagi avalikustab, hakkab rakendus neid automaatselt kuvama.</p>
+        <p>Puu <strong>väärtusklass</strong> (I&ndash;V) on toodud otsuse detailvaates raie.tallinn.ee lehel, aga ainult teatud tüüpi otsuste (peamiselt ehitusealune raie ja sanitaarraie) puude tabelis &mdash; ohtliku puu/oksa otsustel seda välja pole. Rakendus loeb väärtusklassi iga otsuse detailvaatest ja kuvab kõrgeima (halvima) leitud väärtusklassi; kui otsuse tüübil seda välja pole, jääb veerg tühjaks. <strong>Dendroloogi</strong> (hindaja) nime raie.tallinn.ee praegu avalikult ei näita &mdash; see väli jääb seetõttu tühjaks, kuni allikas selle info avalikustab.</p>
         <p>Kaart kuvab aerofoto hetktõmmise (Esri/ArcGIS World Imagery), millele on lisatud raielubade asukohad. See uuendatakse andmete värskendamisel; klõpsates täpil avaneb sama koha reaalne Google Street View.</p>
-        <p><strong>Ajalugu:</strong> Load vaates saab otsuse kuupäeva järgi filtreerida tagasiulatuvalt kuni 2020. aasta alguseni (kokku ligi 18 700 otsust). Need vanemad otsused pärinevad raie.tallinn.ee nimekirjavaatest ning ei sisalda täpseid GPS-koordinaate ega puu läbimõõtu &ndash; seetõttu ei kuvata neid Kaardil ega raadiuse-otsingus, küll aga on igaühe juures link algsele otsusele.</p>
+        <p><strong>Ajalugu:</strong> Load vaates saab otsuse kuupäeva järgi filtreerida tagasiulatuvalt kuni 2020. aasta alguseni (kokku ligi 18 700 otsust). Need vanemad otsused pärinevad raie.tallinn.ee nimekirjavaatest ning ei sisalda algselt puu läbimõõtu. Aadresside asukoht (GPS-koordinaadid) leitakse eraldi Maa-ameti aadressiteenusega ja lisatakse andmetele järk-järgult &mdash; otsus, mille aadressi pole veel geokodeeritud, ei ilmu Kaardile ega raadiuse-otsingusse, kuid link algsele otsusele ja aadressipõhine Google Mapsi otsing on igaühe juures olemas.</p>
       </div>
     </div>
   </div>
@@ -838,11 +840,13 @@ document.querySelector('#view-browse .filters').closest('.panel').addEventListen
 
 // ---- Asukoha hüpikaken (Google Maps / Street View) ----
 function openLocationPopup({title, lat, lng}){
-  if(lat==null || lng==null) return;
-  const mapsUrl = `https://www.google.com/maps?q=${lat},${lng}`;
-  const svUrl = `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}`;
+  const hasCoord = lat!=null && lng!=null && !isNaN(lat) && !isNaN(lng);
+  if(!hasCoord && !title) return;
+  const q = encodeURIComponent(`${title||''}, Tallinn`);
+  const mapsUrl = hasCoord ? `https://www.google.com/maps?q=${lat},${lng}` : `https://www.google.com/maps/search/?api=1&query=${q}`;
+  const svUrl = hasCoord ? `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}` : `https://www.google.com/maps/search/?api=1&query=${q}`;
   document.getElementById('geoPopupTitle').textContent = title || 'Valitud asukoht';
-  document.getElementById('geoPopupSub').textContent = `${(+lat).toFixed(5)}, ${(+lng).toFixed(5)}`;
+  document.getElementById('geoPopupSub').textContent = hasCoord ? `${(+lat).toFixed(5)}, ${(+lng).toFixed(5)}` : 'Täpne asukoht (GPS) pole veel teada — avaneb aadressiotsing Google Mapsis';
   document.getElementById('geoPopupMapsLink').href = mapsUrl;
   document.getElementById('geoPopupSvLink').href = svUrl;
   document.getElementById('geoPopupUrlField').value = svUrl;
@@ -874,6 +878,14 @@ document.getElementById('permitBody').addEventListener('click', (e)=>{
   openLocationPopup({title: btn.dataset.addr, lat: parseFloat(btn.dataset.lat), lng: parseFloat(btn.dataset.lng)});
 });
 
+function valueClassBadge(vc){
+  return vc ? `<span class="vclass-badge vclass-${vc}">${vc}</span>` : '<span class="empty-note" style="padding:0;">&mdash;</span>';
+}
+function valueClassDot(vc){
+  if(vc==='V') return 'dot-red';
+  if(vc==='IV') return 'dot-yellow';
+  return 'dot-green';
+}
 function haversineKm(lat1,lng1,lat2,lng2){
   const R=6371, toRad=d=>d*Math.PI/180;
   const dLat=toRad(lat2-lat1), dLng=toRad(lng2-lng1);
@@ -957,7 +969,7 @@ function renderPermits(){
 
   const tbody = document.getElementById('permitBody');
   if(rows.length===0){
-    tbody.innerHTML = '<tr><td colspan="6" class="empty-note">Ühtegi luba ei vasta valitud tingimustele.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-note">Ühtegi luba ei vasta valitud tingimustele.</td></tr>';
     return;
   }
   tbody.innerHTML = rows.slice(0,150).map(p=>{
@@ -965,12 +977,13 @@ function renderPermits(){
       : (p.species && p.species.length ? p.species.map(sp=>({species:sp, diameterCm:p.maxDiameterCm||null})) : [{species:'—', diameterCm:null}]);
     const treeChips = trees.map(t=>`<span class="tree-chip">${t.species||'—'}${t.diameterCm?` <span class="d">${t.diameterCm}cm</span>`:''}</span>`).join('');
     const reasonTxt = [...new Set(trees.map(t=>t.reason).filter(Boolean))].join(', ') || (p.permitTypes||[]).join(', ');
-    const geoBtn = (p.lat!=null && p.lng!=null) ? `<button type="button" class="geo-open-btn" data-lat="${p.lat}" data-lng="${p.lng}" data-addr="${(p.address||'').replace(/"/g,'&quot;')}">📍 Ava kaardil / Street View</button>` : '';
+    const geoBtn = `<button type="button" class="geo-open-btn" data-lat="${p.lat!=null?p.lat:''}" data-lng="${p.lng!=null?p.lng:''}" data-addr="${(p.address||'').replace(/"/g,'&quot;')}">📍 Ava kaardil / Street View</button>`;
     const docLink = p.detailUrl ? `<a class="doclink" href="${p.detailUrl}" target="_blank" rel="noopener">Otsus ${p.loaNr}</a>` : `Otsus ${p.loaNr}`;
     return `<tr>
       <td><div class="addr">${p.address||'—'}</div><span class="district-pill">${p.district||'—'}</span></td>
       <td>${treeChips}</td>
       <td><span class="reason-tag">${reasonTxt||'—'}</span></td>
+      <td>${valueClassBadge(p.valueClass)}</td>
       <td>${p.decision||'—'}</td>
       <td class="date-cell">${fmtDate(p.decidedAt)}${p.validUntil?`<br>kuni ${fmtDate(p.validUntil)}`:''}</td>
       <td>
@@ -978,7 +991,7 @@ function renderPermits(){
         <div class="linkrow">${geoBtn}</div>
       </td>
     </tr>`;
-  }).join('') + (rows.length>150 ? `<tr><td colspan="6" class="empty-note">Näidatakse esimesed 150 tulemust ${rows.length}-st. Täpsusta otsingut (linnaosa, puuliik, kuupäevad), et kitsendada.</td></tr>` : '');
+  }).join('') + (rows.length>150 ? `<tr><td colspan="7" class="empty-note">Näidatakse esimesed 150 tulemust ${rows.length}-st. Täpsusta otsingut (linnaosa, puuliik, kuupäevad), et kitsendada.</td></tr>` : '');
 }
 
 function renderDendro(){
@@ -1003,10 +1016,10 @@ document.getElementById('boardDendro').addEventListener('click', (e)=>{
   if(!list.length){
     detail.innerHTML = `<div class="empty-note">${name}: seotud otsuseid pole veel laaditud.</div>`;
   } else {
-    detail.innerHTML = `<div class="desc" style="margin-bottom:8px;"><strong>${name}</strong> &mdash; ${list.length} otsust (demoandmed):</div>` +
+    detail.innerHTML = `<div class="desc" style="margin-bottom:8px;"><strong>${name}</strong> &mdash; ${list.length} otsust:</div>` +
       '<div class="sub-list">' + list.slice(0,20).map(p=>`
         <div class="sub-row">
-          <div class="meta">${p.address||'—'} &middot; ${p.decidedAt||''}</div>
+          <div class="meta">${p.address||'—'} &middot; väärtusklass ${p.valueClass||'—'} &middot; ${p.decidedAt||''}</div>
           ${p.detailUrl?`<a href="${p.detailUrl}" target="_blank" rel="noopener">Otsus ${p.loaNr}</a>`:''}
         </div>`).join('') + '</div>';
   }
@@ -1171,13 +1184,13 @@ function renderMap(){
     if(x<0||x>100||y<0||y>100){ skippedOffMap++; return; }
     const dot = document.createElement('button');
     dot.type = 'button';
-    dot.className = 'map-pin dot-green';
+    dot.className = 'map-pin ' + valueClassDot(p.valueClass);
     dot.style.left = x+'%'; dot.style.top = y+'%';
     dot.style.transform = `translate(-50%,-50%) scale(${1/mapZoom})`;
     const sp = (p.trees && p.trees[0] && p.trees[0].species) || (p.species||[])[0] || '—';
     const rs = (p.trees && p.trees[0] && p.trees[0].reason) || (p.permitTypes||[])[0] || '—';
     dot.addEventListener('mouseenter', ()=>{
-      tip.innerHTML = `<strong>${p.address||'—'}</strong><br>${sp}<br>${rs}`;
+      tip.innerHTML = `<strong>${p.address||'—'}</strong><br>${sp}<br>${rs}${p.valueClass?`<br>väärtusklass ${p.valueClass}`:''}`;
       const {x:px, y:py} = mapPctToScreenPx(x, y);
       tip.style.left = px+'px'; tip.style.top = py+'px';
       tip.hidden = false;
@@ -1236,7 +1249,7 @@ function renderSyncPill(){
   try{ db = FIRESTORE_DB; }catch(e){ db = null; }
   if(!db){
     document.getElementById('syncText').textContent = 'Andmebaas pole hetkel kättesaadav';
-    document.getElementById('permitBody').innerHTML = '<tr><td colspan="6" class="empty-note">Andmebaas pole hetkel kättesaadav. Proovi lehte hiljem uuesti värskendada.</td></tr>';
+    document.getElementById('permitBody').innerHTML = '<tr><td colspan="7" class="empty-note">Andmebaas pole hetkel kättesaadav. Proovi lehte hiljem uuesti värskendada.</td></tr>';
     return;
   }
 
