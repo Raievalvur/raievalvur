@@ -1187,8 +1187,15 @@ function renderMap(){
     dot.className = 'map-pin ' + valueClassDot(p.valueClass);
     dot.style.left = x+'%'; dot.style.top = y+'%';
     dot.style.transform = `translate(-50%,-50%) scale(${1/mapZoom})`;
-    const sp = (p.trees && p.trees[0] && p.trees[0].species) || (p.species||[])[0] || '—';
-    const rs = (p.trees && p.trees[0] && p.trees[0].reason) || (p.permitTypes||[])[0] || '—';
+    // Kui otsiti konkreetset puuliiki/põhjust, näitame hüpikaknas seda, mitte esimest
+    // juhuslikku puud samalt loalt (nt kui otsid "tamm", aga loal on ka kuusk ja pärn,
+    // ei tohi tooltip näidata "kuusk" — see tekitab asjatut segadust).
+    let matchedTree = hasTrees && species.length ? p.trees.find(t=>species.includes(t.species)) : null;
+    if(!matchedTree && hasTrees && reasons.length) matchedTree = p.trees.find(t=>reasons.includes(t.reason));
+    const matchedSpeciesFallback = species.length ? (p.species||[]).find(s=>species.includes(s)) : null;
+    const matchedReasonFallback = reasons.length ? (p.permitTypes||[]).find(r=>reasons.includes(r)) : null;
+    const sp = (matchedTree && matchedTree.species) || matchedSpeciesFallback || (p.trees && p.trees[0] && p.trees[0].species) || (p.species||[])[0] || '—';
+    const rs = (matchedTree && matchedTree.reason) || matchedReasonFallback || (p.trees && p.trees[0] && p.trees[0].reason) || (p.permitTypes||[])[0] || '—';
     dot.addEventListener('mouseenter', ()=>{
       tip.innerHTML = `<strong>${p.address||'—'}</strong><br>${sp}<br>${rs}${p.valueClass?`<br>väärtusklass ${p.valueClass}`:''}`;
       const {x:px, y:py} = mapPctToScreenPx(x, y);
