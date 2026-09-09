@@ -1,0 +1,15 @@
+{
+  "name": "raievalvur-sync",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Tunnine taustatoo: uute Tallinna raielubade tuvastamine, vaartusklassi/koordinaatide lisamine ja e-posti teavituste saatmine.",
+  "main": "sync.js",
+  "scripts": {
+    "sync": "node sync.js"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0",
+    "firebase-admin": "^12.6.0",
+    "nodemailer": "^6.9.15"
+  }
+}
