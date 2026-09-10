@@ -8,6 +8,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.css">
 </head>
 <body>
 
@@ -213,7 +216,7 @@
   <div class="view" id="view-map">
     <div class="panel">
       <h2>Kaart</h2>
-      <div class="desc">Raielubade asukohad Tallinna aerofotol, filtreeritavad samade tingimustega mis Load vaates. Hoia hiirekursorit täpil, et näha puuliiki ja põhjust; klõpsa täpil, et avada see koht Google Mapsis / Street View&#39;s.</div>
+      <div class="desc">Raielubade asukohad Tallinna aerofotokaardil, filtreeritavad samade tingimustega mis Load vaates. Hoia hiirekursorit täpil, et näha puuliiki ja põhjust; klõpsa täpil, et avada see koht Google Mapsis / Street View&#39;s.</div>
       <div class="filters">
         <div class="field">
           <label>Puuliik</label>
@@ -248,15 +251,9 @@
       </div>
       <div class="map-wrap" id="mapWrap">
         <div class="map-zoom-controls">
-          <button type="button" class="map-zoom-btn" id="mapZoomIn" title="Suurenda">+</button>
-          <button type="button" class="map-zoom-btn" id="mapZoomOut" title="V&auml;henda">&minus;</button>
           <button type="button" class="map-zoom-btn" id="mapZoomReset" title="Algne suurus">&#8634;</button>
         </div>
-        <div class="map-canvas" id="mapCanvas">
-        <img src="assets/map-tallinn.jpg" class="map-bg" alt="Tallinna aerofoto" draggable="false">
-        <div class="map-pins" id="mapPins"></div>
-        </div>
-        <div class="map-tooltip" id="mapTooltip" hidden></div>
+        <div id="leafletMap" class="leaflet-map-el"></div>
       </div>
       <div class="map-legend">
         <span class="legend-item"><span class="dot dot-green"></span> I&ndash;III väärtusklass / teadmata</span>
@@ -264,7 +261,7 @@
         <span class="legend-item"><span class="dot dot-red"></span> V väärtusklass (likvideeritav)</span>
       </div>
       <div class="hint" id="mapNote"></div>
-      <div class="hint" style="margin-top:10px;">Kaardi aluspilt on aerofoto hetktõmmis (uuendatakse andmete värskendamisel) &mdash; platvormi turvapiirangute tõttu ei saa siia sisse ehitada otse Google Mapsi live-vidinat, mistõttu kasutame samaväärset lahendust: aerofoto peal kuvatavad täpid, mis avavad klõpsates päris Google Street View&#39;i.</div>
+      <div class="hint" style="margin-top:10px;">Kaardi aluspilt on Esri/ArcGIS World Imagery elavad aerofoto kaardiplaadid &mdash; platvormi turvapiirangute tõttu ei saa siia sisse ehitada otse Google Mapsi live-vidinat, mistõttu kasutame samaväärset lahendust: aerofotokaardil kuvatavad täpid, mis avavad klõpsates päris Google Street View&#39;i.</div>
     </div>
   </div>
 
@@ -278,7 +275,7 @@
         <p>Loa <strong>taotleja</strong> nime register avalikult ei näita &mdash; seda välja hoitakse andmestruktuuris tühjana. Loa <strong>väljaandja</strong> on otsuse teinud linnaosa valitsus.</p>
         <p>Andmed uuenevad automaatselt iga tunni tagant (uued otsused, väärtusklass ja koordinaadid); viimase uuenduse aeg on kirjas ülal paremas nurgas. "Telli teavitus" all saab valida oma kriteeriumitele (puuliik, põhjus, linnaosa, läbimõõt, asukoha raadius) vastavate uute otsuste kohta e-posti teavituse.</p>
         <p>Puu <strong>väärtusklass</strong> (I&ndash;V) on toodud otsuse detailvaates raie.tallinn.ee lehel, aga ainult teatud tüüpi otsuste (peamiselt ehitusealune raie ja sanitaarraie) puude tabelis &mdash; ohtliku puu/oksa otsustel seda välja pole. Rakendus loeb väärtusklassi iga otsuse detailvaatest ja kuvab kõrgeima (halvima) leitud väärtusklassi; kui otsuse tüübil seda välja pole, jääb veerg tühjaks. <strong>Dendroloogi</strong> (hindaja) nime raie.tallinn.ee praegu avalikult ei näita &mdash; see väli jääb seetõttu tühjaks, kuni allikas selle info avalikustab.</p>
-        <p>Kaart kuvab aerofoto hetktõmmise (Esri/ArcGIS World Imagery), millele on lisatud raielubade asukohad. See uuendatakse andmete värskendamisel; klõpsates täpil avaneb sama koha reaalne Google Street View.</p>
+        <p>Kaart kasutab Esri/ArcGIS World Imagery elavaid aerofoto kaardiplaate, millele on lisatud raielubade asukohad; lähestikku asuvad load koondatakse suumitasemest sõltuvalt arvuga tähistatud rühmadeks. Klõpsates üksikul täpil avaneb sama koha reaalne Google Street View.</p>
         <p><strong>Ajalugu:</strong> Load vaates saab otsuse kuupäeva järgi filtreerida tagasiulatuvalt kuni 2020. aasta alguseni (kokku ligi 18 700 otsust). Need vanemad otsused pärinevad raie.tallinn.ee nimekirjavaatest ning ei sisalda algselt puu läbimõõtu. Aadresside asukoht (GPS-koordinaadid) leitakse eraldi Maa-ameti aadressiteenusega ja lisatakse andmetele järk-järgult &mdash; otsus, mille aadressi pole veel geokodeeritud, ei ilmu Kaardile ega raadiuse-otsingusse, kuid link algsele otsusele ja aadressipõhine Google Mapsi otsing on igaühe juures olemas.</p>
       </div>
     </div>
@@ -314,6 +311,8 @@
 <script src="js/render.js"></script>
 <script src="js/filters-ui.js"></script>
 <script src="js/geo-popup.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.js"></script>
 <script src="js/map.js"></script>
 <script src="js/sync-pill.js"></script>
 <script src="js/app.js"></script>

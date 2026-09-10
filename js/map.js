@@ -1,130 +1,71 @@
-// ---- Kaart: aerofoto + raielubade asukohatäpid ----
-const MAP_BBOX = {minLon:24.55, maxLon:24.92, minLat:59.35, maxLat:59.50};
-function mercY(latDeg){ const r = latDeg*Math.PI/180; return Math.log(Math.tan(Math.PI/4 + r/2)); }
-const MERC_TOP = mercY(MAP_BBOX.maxLat), MERC_BOTTOM = mercY(MAP_BBOX.minLat);
-function latLngToPct(lat,lng){
-  const x = (lng - MAP_BBOX.minLon) / (MAP_BBOX.maxLon - MAP_BBOX.minLon) * 100;
-  const y = (MERC_TOP - mercY(lat)) / (MERC_TOP - MERC_BOTTOM) * 100;
-  return {x,y};
+// ---- Kaart: Leaflet + Esri World Imagery kaardiplaadid + suumipõhine klasterdamine ----
+// Varem oli siin käsitsi kirjutatud pan/suum ühe staatilise aerofoto peal — see
+// nägi suurel suumil hägune välja, sest üks pilt lihtsalt CSS-iga suurendati.
+// Leaflet laadib õige resolutsiooniga kaardiplaadi iga suumitaseme jaoks eraldi
+// ja Leaflet.markercluster hoolitseb suumipõhise klasterdamise eest.
+const TALLINN_BOUNDS = L.latLngBounds([59.35,24.55],[59.50,24.92]);
+function valueClassColor(vc){
+  if(vc==='V') return '#d1453b';
+  if(vc==='IV') return '#e0a83c';
+  return '#3fae5c';
 }
-let mapPinData = [];
+const VALUE_CLASS_RANK = {V:3, IV:2}; // kõik muu (sh teadmata) on 1 — klastri jaoks valime "halvima" väärtusklassi
+function escapeMapText(s){
+  return String(s==null?'':s).replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+}
 
-// ---- Kaardi suum ja liigutamine (vanilla JS — CSS transform lõuendil, täpid liiguvad kaasa) ----
-const MAP_ZOOM_MIN = 1, MAP_ZOOM_MAX = 7;
-let mapZoom = 1, mapPanX = 0, mapPanY = 0;
-let mapDragging = false, mapDragMoved = false, mapDragStartX = 0, mapDragStartY = 0, mapPanStartX = 0, mapPanStartY = 0;
+const rvMap = L.map('leafletMap', {minZoom:9, maxZoom:19, zoomControl:true});
+rvMap.fitBounds(TALLINN_BOUNDS);
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  maxZoom: 19,
+  attribution: 'Aerofoto: &copy; Esri, Maxar, Earthstar Geographics'
+}).addTo(rvMap);
 
-function applyMapTransform(){
-  const canvas = document.getElementById('mapCanvas');
-  if(canvas) canvas.style.transform = `translate(${mapPanX}px, ${mapPanY}px) scale(${mapZoom})`;
-  document.getElementById('mapTooltip').hidden = true;
-  updateMapPinScale();
-}
-function updateMapPinScale(){
-  // täpid jäävad suumist hoolimata ühesuurusteks: liigume kaanevaate suurendusega
-  // kaasa (parent scale(mapZoom)), aga korrutame iga täpi enda skaala pöördväärtusega,
-  // nii et lõplik ekraanisuurus jääb konstantseks.
-  const inv = 1 / mapZoom;
-  document.querySelectorAll('#mapPins .map-pin').forEach(dot=>{
-    dot.style.transform = `translate(-50%,-50%) scale(${inv})`;
+const rvClusterGroup = L.markerClusterGroup({
+  maxClusterRadius: 50,
+  spiderfyOnMaxZoom: true,
+  showCoverageOnHover: false,
+  iconCreateFunction: function(cluster){
+    const children = cluster.getAllChildMarkers();
+    let worstRank = 1, worstVc = null;
+    children.forEach(m=>{
+      const rank = VALUE_CLASS_RANK[m.options.valueClass] || 1;
+      if(rank > worstRank || worstVc===null){ worstRank = rank; worstVc = m.options.valueClass; }
+    });
+    const count = children.length;
+    const size = Math.round(Math.min(44, 26 + Math.sqrt(count)*3));
+    return L.divIcon({
+      html: `<div class="rv-cluster-dot" style="background:${valueClassColor(worstVc)}">${count}</div>`,
+      className: '',
+      iconSize: [size, size]
+    });
+  }
+});
+rvMap.addLayer(rvClusterGroup);
+
+function pinIcon(vc){
+  return L.divIcon({
+    html: `<div class="rv-pin-dot" style="background:${valueClassColor(vc)}"></div>`,
+    className: '',
+    iconSize: [14, 14]
   });
 }
-function clampMapPan(w, h){
-  const minPanX = -(w * (mapZoom - 1)), minPanY = -(h * (mapZoom - 1));
-  mapPanX = Math.min(0, Math.max(minPanX, mapPanX));
-  mapPanY = Math.min(0, Math.max(minPanY, mapPanY));
-}
-function setMapZoom(newZoom, cx, cy){
-  const viewport = document.getElementById('mapWrap');
-  if(!viewport) return;
-  const w = viewport.clientWidth, h = viewport.clientHeight;
-  if(!w || !h) return;
-  newZoom = Math.min(MAP_ZOOM_MAX, Math.max(MAP_ZOOM_MIN, newZoom));
-  if(cx==null || cy==null){ cx = w/2; cy = h/2; }
-  const canvasX = (cx - mapPanX) / mapZoom;
-  const canvasY = (cy - mapPanY) / mapZoom;
-  mapZoom = newZoom;
-  mapPanX = cx - canvasX * mapZoom;
-  mapPanY = cy - canvasY * mapZoom;
-  clampMapPan(w, h);
-  applyMapTransform();
-}
-function mapPctToScreenPx(xPct, yPct){
-  const viewport = document.getElementById('mapWrap');
-  const w = viewport.clientWidth, h = viewport.clientHeight;
-  const canvasX = (xPct/100) * w, canvasY = (yPct/100) * h;
-  return { x: canvasX * mapZoom + mapPanX, y: canvasY * mapZoom + mapPanY };
-}
-(function wireMapZoomPan(){
-  const viewport = document.getElementById('mapWrap');
-  if(!viewport) return;
-  viewport.addEventListener('wheel', (e)=>{
-    e.preventDefault();
-    const rect = viewport.getBoundingClientRect();
-    const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
-    const factor = e.deltaY < 0 ? 1.25 : 0.8;
-    setMapZoom(mapZoom * factor, cx, cy);
-  }, {passive:false});
-  viewport.addEventListener('mousedown', (e)=>{
-    if(e.button !== 0) return;
-    mapDragging = true; mapDragMoved = false;
-    mapDragStartX = e.clientX; mapDragStartY = e.clientY;
-    mapPanStartX = mapPanX; mapPanStartY = mapPanY;
-    viewport.classList.add('dragging');
+
+// Kaardi vahekaart oli laadimise ajal peidetud (display:none), mistõttu Leaflet
+// arvutas oma kaardiplaatide võrgu vale (0x0) konteineri suuruse peale —
+// mõõdistame ja (esimesel avamisel) kaadreerime kaardi uuesti, kui vahekaart avatakse.
+let rvMapEverShown = false;
+const mapTabBtn = document.querySelector('.tab-btn[data-view="map"]');
+if(mapTabBtn) mapTabBtn.addEventListener('click', ()=>{
+  requestAnimationFrame(()=>{
+    rvMap.invalidateSize();
+    if(!rvMapEverShown){ rvMap.fitBounds(TALLINN_BOUNDS); rvMapEverShown = true; }
   });
-  window.addEventListener('mousemove', (e)=>{
-    if(!mapDragging) return;
-    const dx = e.clientX - mapDragStartX, dy = e.clientY - mapDragStartY;
-    if(Math.abs(dx) > 3 || Math.abs(dy) > 3) mapDragMoved = true;
-    if(mapDragMoved){
-      mapPanX = mapPanStartX + dx; mapPanY = mapPanStartY + dy;
-      const rect = viewport.getBoundingClientRect();
-      clampMapPan(rect.width, rect.height);
-      applyMapTransform();
-    }
-  });
-  window.addEventListener('mouseup', ()=>{
-    if(mapDragging){ mapDragging = false; viewport.classList.remove('dragging'); }
-  });
-  // Puuteseadmed: ühe sõrmega liigutamine, kahe sõrmega suum
-  let touchMode = null, touchStartDist = 0, touchStartZoom = 1;
-  viewport.addEventListener('touchstart', (e)=>{
-    if(e.touches.length === 1){
-      touchMode = 'pan'; mapDragMoved = false;
-      mapDragStartX = e.touches[0].clientX; mapDragStartY = e.touches[0].clientY;
-      mapPanStartX = mapPanX; mapPanStartY = mapPanY;
-    } else if(e.touches.length === 2){
-      touchMode = 'zoom';
-      const [t1,t2] = e.touches;
-      touchStartDist = Math.hypot(t2.clientX-t1.clientX, t2.clientY-t1.clientY);
-      touchStartZoom = mapZoom;
-    }
-  }, {passive:true});
-  viewport.addEventListener('touchmove', (e)=>{
-    if(touchMode === 'pan' && e.touches.length === 1){
-      const dx = e.touches[0].clientX - mapDragStartX, dy = e.touches[0].clientY - mapDragStartY;
-      if(Math.abs(dx) > 3 || Math.abs(dy) > 3) mapDragMoved = true;
-      mapPanX = mapPanStartX + dx; mapPanY = mapPanStartY + dy;
-      const rect = viewport.getBoundingClientRect();
-      clampMapPan(rect.width, rect.height);
-      applyMapTransform();
-    } else if(touchMode === 'zoom' && e.touches.length === 2){
-      const [t1,t2] = e.touches;
-      const dist = Math.hypot(t2.clientX-t1.clientX, t2.clientY-t1.clientY);
-      const rect = viewport.getBoundingClientRect();
-      const cx = (t1.clientX+t2.clientX)/2 - rect.left, cy = (t1.clientY+t2.clientY)/2 - rect.top;
-      setMapZoom(touchStartZoom * (dist/touchStartDist), cx, cy);
-    }
-  }, {passive:true});
-  viewport.addEventListener('touchend', ()=>{ touchMode = null; });
-  document.getElementById('mapZoomIn').addEventListener('click', ()=> setMapZoom(mapZoom * 1.4));
-  document.getElementById('mapZoomOut').addEventListener('click', ()=> setMapZoom(mapZoom / 1.4));
-  document.getElementById('mapZoomReset').addEventListener('click', ()=>{ mapZoom = 1; mapPanX = 0; mapPanY = 0; applyMapTransform(); });
-})();
+});
+window.addEventListener('resize', ()=> rvMap.invalidateSize());
+document.getElementById('mapZoomReset').addEventListener('click', ()=> rvMap.fitBounds(TALLINN_BOUNDS));
 
 function renderMap(){
-  const wrap = document.getElementById('mapPins');
-  if(!wrap) return;
   const from = document.getElementById('mapFrom').value;
   const to = document.getElementById('mapTo').value;
   const species = selectedValues(document.getElementById('mSpecies'));
@@ -132,10 +73,8 @@ function renderMap(){
   const districts = selectedValues(document.getElementById('mDistrict'));
   const minDiam = parseFloat(document.getElementById('mDiam').value)||0;
   const note = document.getElementById('mapNote');
-  let shown = 0, skippedNoGeo = 0, skippedOutOfRange = 0, skippedOffMap = 0, skippedFilter = 0;
-  wrap.innerHTML = '';
-  mapPinData = [];
-  const tip = document.getElementById('mapTooltip');
+  let shown = 0, skippedNoGeo = 0, skippedOutOfRange = 0, skippedFilter = 0;
+  const markers = [];
   const seenLoaNr = new Set(PERMITS.map(p=>p.loaNr));
   const source = ARCHIVE_PERMITS.length ? PERMITS.concat(ARCHIVE_PERMITS.filter(p=>!seenLoaNr.has(p.loaNr))) : PERMITS;
   source.forEach(p=>{
@@ -153,13 +92,6 @@ function renderMap(){
         if(!p.trees.some(t=>(t.diameterCm||0)>=minDiam)){ skippedFilter++; return; }
       } else if(p.maxDiameterCm!=null && p.maxDiameterCm < minDiam){ skippedFilter++; return; }
     }
-    const {x,y} = latLngToPct(p.lat, p.lng);
-    if(x<0||x>100||y<0||y>100){ skippedOffMap++; return; }
-    const dot = document.createElement('button');
-    dot.type = 'button';
-    dot.className = 'map-pin ' + valueClassDot(p.valueClass);
-    dot.style.left = x+'%'; dot.style.top = y+'%';
-    dot.style.transform = `translate(-50%,-50%) scale(${1/mapZoom})`;
     // Kui otsiti konkreetset puuliiki/põhjust, näitame hüpikaknas seda, mitte esimest
     // juhuslikku puud samalt loalt (nt kui otsid "tamm", aga loal on ka kuusk ja pärn,
     // ei tohi tooltip näidata "kuusk" — see tekitab asjatut segadust).
@@ -169,26 +101,25 @@ function renderMap(){
     const matchedReasonFallback = reasons.length ? (p.permitTypes||[]).find(r=>reasons.includes(r)) : null;
     const sp = (matchedTree && matchedTree.species) || matchedSpeciesFallback || (p.trees && p.trees[0] && p.trees[0].species) || (p.species||[])[0] || '—';
     const rs = (matchedTree && matchedTree.reason) || matchedReasonFallback || (p.trees && p.trees[0] && p.trees[0].reason) || (p.permitTypes||[])[0] || '—';
-    dot.addEventListener('mouseenter', ()=>{
-      tip.innerHTML = `<strong>${p.address||'—'}</strong><br>${sp}<br>${rs}${p.valueClass?`<br>väärtusklass ${p.valueClass}`:''}`;
-      const {x:px, y:py} = mapPctToScreenPx(x, y);
-      tip.style.left = px+'px'; tip.style.top = py+'px';
-      tip.hidden = false;
-    });
-    dot.addEventListener('mouseleave', ()=>{ tip.hidden = true; });
-    dot.addEventListener('click', ()=>{
-      if(mapDragMoved) return;
-      openLocationPopup({title: p.address, lat: p.lat, lng: p.lng});
-    });
-    wrap.appendChild(dot);
-    mapPinData.push({x,y});
+
+    const marker = L.marker([p.lat, p.lng], {icon: pinIcon(p.valueClass), valueClass: p.valueClass});
+    marker.bindTooltip(
+      `<strong>${escapeMapText(p.address||'—')}</strong><br>${escapeMapText(sp)}<br>${escapeMapText(rs)}${p.valueClass?`<br>väärtusklass ${escapeMapText(p.valueClass)}`:''}`,
+      {direction:'top', className:'rv-tooltip'}
+    );
+    marker.on('click', ()=> openLocationPopup({title: p.address, lat: p.lat, lng: p.lng}));
+    markers.push(marker);
     shown++;
   });
+
+  rvClusterGroup.clearLayers();
+  rvClusterGroup.addLayers(markers);
+
   const bits = [`Kaardil ${shown} luba`];
   if(skippedOutOfRange) bits.push(`${skippedOutOfRange} jääb valitud ajavahemikust välja`);
   if(skippedFilter) bits.push(`${skippedFilter} ei vasta valitud filtritele`);
   if(skippedNoGeo) bits.push(`${skippedNoGeo} ilma täpse aadressita (geo-andmeta)`);
-  note.textContent = bits.join(', ') + '. Suumi hiirerattaga või +/- nuppudega, lohista kaardi liigutamiseks.';
+  note.textContent = bits.join(', ') + '. Lähedased load koondatakse suumitasemest sõltuvalt punktideks — suumi hiirerattaga või kaardi + / - nuppudega, lohista kaardi liigutamiseks.';
 }
 fillMultiSelect(document.getElementById('mSpecies'), SPECIES_LIST, 'Puuliik');
 fillMultiSelect(document.getElementById('mReason'), REASON_LIST, 'Põhjus');
@@ -212,4 +143,3 @@ document.getElementById('mapPresetRow').addEventListener('click', (e)=>{
   }
   renderMap();
 });
-

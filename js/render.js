@@ -1,11 +1,6 @@
 function valueClassBadge(vc){
   return vc ? `<span class="vclass-badge vclass-${vc}">${vc}</span>` : '<span class="empty-note" style="padding:0;">&mdash;</span>';
 }
-function valueClassDot(vc){
-  if(vc==='V') return 'dot-red';
-  if(vc==='IV') return 'dot-yellow';
-  return 'dot-green';
-}
 function haversineKm(lat1,lng1,lat2,lng2){
   const R=6371, toRad=d=>d*Math.PI/180;
   const dLat=toRad(lat2-lat1), dLng=toRad(lng2-lng1);

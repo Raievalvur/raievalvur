@@ -319,9 +319,9 @@ async function main() {
     console.log(`Aktiivseid tellimusi: ${subsSnap.size}.`);
     for (const subDoc of subsSnap.docs) {
       const sub = subDoc.data();
-      const matches = newPermits.filter((p) => matchesSubscription(sub, p));
-      if (!matches.length) continue;
       try {
+        const matches = newPermits.filter((p) => matchesSubscription(sub, p));
+        if (!matches.length) continue;
         const manageLink = `${APP_URL}?manage=${subDoc.id}`;
         await sendDigestEmail(transporter, sub.email, matches, manageLink);
         const maxMatched = Math.max(...matches.map((p) => parseInt(p.loaNr, 10)).filter((n) => !isNaN(n)), 0);
