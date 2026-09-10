@@ -62,6 +62,17 @@
     document.getElementById('statSubs').textContent = s.size;
   }, err=>{ document.getElementById('statSubs').textContent = '—'; });
 
+  // Tellimuse ID on juhuslik, mitteoletatav token (mitte Firestore auto-id) —
+  // selle teadmine on ainus "õigus" tellimust hallata (vt firestore.rules.txt:
+  // list on suletud, get/update on lubatud, sest id-d ei saa ära arvata).
+  function generateSubscriptionToken(){
+    if(window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
+    return 'sub-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+  }
+  function manageLinkFor(token){
+    return `${location.origin}${location.pathname}?manage=${token}`;
+  }
+
   // subscribe form
   document.getElementById('subForm').addEventListener('submit', async (e)=>{
     e.preventDefault();
@@ -75,7 +86,8 @@
       const lastLoaNr = SYNC_STATE ? (SYNC_STATE.lastLoaNr||0) : 0;
       const addrVal = document.getElementById('subAddress').value.trim();
       const knownLoc = LOCATION_INDEX[addrVal];
-      await db.collection('subscriptions').add({
+      const token = generateSubscriptionToken();
+      await db.collection('subscriptions').doc(token).set({
         email,
         minDiameterCm: parseFloat(document.getElementById('subDiam').value)||0,
         species: selectedValues(document.getElementById('subSpecies')),
@@ -89,7 +101,8 @@
         createdAt: new Date().toISOString(),
         lastNotifiedLoaNr: lastLoaNr
       });
-      toast.textContent = 'Tellimus salvestatud. Teavitused hakkavad tulema järgmiste uute otsuste kohta.';
+      const link = manageLinkFor(token);
+      toast.innerHTML = `Tellimus salvestatud. Teavitused hakkavad tulema järgmiste uute otsuste kohta.<br>Salvesta see link tellimuse haldamiseks (näed seda ka igas teavituskirjas): <a href="${link}">${link}</a>`;
       toast.className = 'toast ok';
       document.getElementById('subForm').reset();
       document.getElementById('subAddressMatch').textContent = '';
@@ -100,40 +113,54 @@
     btn.disabled = false; btn.textContent = 'Telli teavitus';
   });
 
-  document.getElementById('lookupBtn').addEventListener('click', async ()=>{
-    const email = document.getElementById('lookupEmail').value.trim();
+  // Tellimuse haldamine (?manage=<token> lingi kaudu, nt teavituskirjast).
+  // Otsingut e-posti järgi enam pole — see nõudis avalikku "list" õigust
+  // subscriptions kollektsioonile, mis lekitas kõigi tellijate e-posti/aadressi.
+  function escapeHtml(s){
+    return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  async function renderManagePanel(token){
     const list = document.getElementById('subList');
-    if(!email){ return; }
-    list.innerHTML = '<div class="empty-note">Otsin&hellip;</div>';
+    list.innerHTML = '<div class="empty-note">Laadin&hellip;</div>';
     try{
-      const snap = await db.collection('subscriptions').where('email','==',email).get();
-      if(snap.empty){ list.innerHTML = '<div class="empty-note">Selle e-postiga tellimusi ei leitud.</div>'; return; }
-      list.innerHTML = '';
-      snap.docs.forEach(doc=>{
-        const d = doc.data();
-        const row = document.createElement('div');
-        row.className = 'sub-row';
-        const bits = [];
-        if(d.minDiameterCm) bits.push(`≥${d.minDiameterCm}cm`);
-        if(d.districts && d.districts.length) bits.push(d.districts.join(', '));
-        if(d.species && d.species.length) bits.push(d.species.join(', '));
-        if(d.radiusM) bits.push(`raadius ${d.radiusM}m`);
-        row.innerHTML = `<div class="meta">${d.active?'Aktiivne':'Peatatud'} &middot; ${bits.join(' &middot; ') || 'kõik load'}</div>`;
-        const btn = document.createElement('button');
-        btn.className = 'ghost-btn';
-        btn.textContent = d.active ? 'Tühista' : 'Tühistatud';
-        btn.disabled = !d.active;
-        btn.addEventListener('click', async ()=>{
-          btn.disabled = true; btn.textContent = 'Tühistan…';
-          try{ await doc_ref_update(doc.id); btn.textContent = 'Tühistatud'; row.querySelector('.meta').textContent = 'Peatatud';}
-          catch(e){ btn.textContent = 'Viga'; }
-        });
-        async function doc_ref_update(id){ await db.doc('subscriptions/'+id).update({active:false}); }
-        row.appendChild(btn);
-        list.appendChild(row);
+      const doc = await db.doc('subscriptions/'+token).get();
+      if(!doc.exists){
+        list.innerHTML = '<div class="empty-note">Tellimust ei leitud &ndash; link on vale või tellimus on juba tühistatud.</div>';
+        return;
+      }
+      const d = doc.data();
+      const bits = [];
+      if(d.minDiameterCm) bits.push(`≥${d.minDiameterCm}cm`);
+      if(d.districts && d.districts.length) bits.push(d.districts.join(', '));
+      if(d.species && d.species.length) bits.push(d.species.join(', '));
+      if(d.reasons && d.reasons.length) bits.push(d.reasons.join(', '));
+      if(d.radiusM) bits.push(`raadius ${d.radiusM}m`);
+      const row = document.createElement('div');
+      row.className = 'sub-row';
+      row.innerHTML = `<div class="meta">${escapeHtml(d.email)} &middot; ${d.active?'Aktiivne':'Peatatud'} &middot; ${bits.join(' &middot; ') || 'kõik load'}</div>`;
+      const btn = document.createElement('button');
+      btn.className = 'ghost-btn';
+      btn.textContent = d.active ? 'Tühista tellimus' : 'Tühistatud';
+      btn.disabled = !d.active;
+      btn.addEventListener('click', async ()=>{
+        btn.disabled = true; btn.textContent = 'Tühistan…';
+        try{
+          await doc.ref.update({active:false});
+          btn.textContent = 'Tühistatud';
+          row.querySelector('.meta').innerHTML = row.querySelector('.meta').innerHTML.replace('Aktiivne','Peatatud');
+        }catch(e){ btn.disabled = false; btn.textContent = 'Viga, proovi uuesti'; }
       });
+      row.appendChild(btn);
+      list.innerHTML = '';
+      list.appendChild(row);
     }catch(err){
-      list.innerHTML = '<div class="empty-note">Otsimine ebaõnnestus.</div>';
+      list.innerHTML = '<div class="empty-note">Tellimuse laadimine ebaõnnestus.</div>';
     }
-  });
+  }
+  const manageToken = new URLSearchParams(location.search).get('manage');
+  if(manageToken){
+    const subTab = document.querySelector('.tab-btn[data-view="subscribe"]');
+    if(subTab) subTab.click();
+    renderManagePanel(manageToken);
+  }
 })();
