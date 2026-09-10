@@ -22,6 +22,7 @@ const admin = require('firebase-admin');
 const nodemailer = require('nodemailer');
 
 const BASE_URL = 'https://raie.tallinn.ee';
+const APP_URL = 'https://airport4.github.io/raievalvur/';
 const LIST_LIMIT = parseInt(process.env.LIST_LIMIT || '100', 10);
 const DISTRICTS = ['Haabersti', 'Kesklinn', 'Kristiine', 'Lasnamäe', 'Mustamäe', 'Nõmme', 'Pirita', 'Põhja-Tallinn'];
 const ROMAN_ORDER = { I: 1, II: 2, III: 3, IV: 4, V: 5 };
@@ -221,7 +222,7 @@ function permitToLine(p) {
   return `${p.address || '—'} (${p.district || 'linnaosa teadmata'}) — ${trees}, ${p.permitTypes.join(', ') || '—'}${p.valueClass ? `, väärtusklass ${p.valueClass}` : ''}\n${p.detailUrl}`;
 }
 
-async function sendDigestEmail(transporter, toEmail, permits) {
+async function sendDigestEmail(transporter, toEmail, permits, manageLink) {
   const subject = permits.length === 1
     ? `Raievalvur: uus raieluba, mis vastab su tellimusele`
     : `Raievalvur: ${permits.length} uut raieluba, mis vastavad su tellimusele`;
@@ -232,9 +233,10 @@ async function sendDigestEmail(transporter, toEmail, permits) {
     '',
     permits.map(permitToLine).join('\n\n'),
     '',
-    'Tellimuse peatamiseks kasuta Raievalvuri "Telli teavitus" vahekaardil oma e-postiga otsingut.',
+    'Tellimuse haldamiseks (peatamiseks) ava:',
+    manageLink,
     '',
-    'https://airport4.github.io/raievalvur/',
+    APP_URL,
   ].join('\n');
   await transporter.sendMail({
     from: `Raievalvur <${process.env.GMAIL_USER}>`,
@@ -317,10 +319,11 @@ async function main() {
     console.log(`Aktiivseid tellimusi: ${subsSnap.size}.`);
     for (const subDoc of subsSnap.docs) {
       const sub = subDoc.data();
-      const matches = newPermits.filter((p) => matchesSubscription(sub, p));
-      if (!matches.length) continue;
       try {
-        await sendDigestEmail(transporter, sub.email, matches);
+        const matches = newPermits.filter((p) => matchesSubscription(sub, p));
+        if (!matches.length) continue;
+        const manageLink = `${APP_URL}?manage=${subDoc.id}`;
+        await sendDigestEmail(transporter, sub.email, matches, manageLink);
         const maxMatched = Math.max(...matches.map((p) => parseInt(p.loaNr, 10)).filter((n) => !isNaN(n)), 0);
         await subDoc.ref.update({ lastNotifiedLoaNr: Math.max(parseInt(sub.lastNotifiedLoaNr || 0, 10), maxMatched) });
         console.log(`Saadetud: ${sub.email} (${matches.length} luba).`);

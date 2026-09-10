@@ -1,10 +1,49 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /subscriptions/{id} {
-      allow read: if true;
-      allow create: if true;
-      allow update: if true;
+
+    // Shape/type check for a new subscription document. Keeps out malformed
+    // writes (wrong types, junk extra fields, unbounded strings/arrays) that
+    // could otherwise crash sync.js or bloat storage. Does NOT verify the
+    // submitter owns `email` — that needs a separate confirm-by-email flow,
+    // still open (see review notes).
+    // NOTE: if a field is ever added to the subscribe form in index.html/app.js,
+    // it must be added here too, or new subscriptions will start failing.
+    function isValidSubscription(d) {
+      return d.keys().hasOnly([
+        'email', 'minDiameterCm', 'species', 'reasons', 'districts',
+        'homeAddress', 'homeLat', 'homeLng', 'radiusM', 'active',
+        'createdAt', 'lastNotifiedLoaNr'
+      ])
+      && d.email is string && d.email.size() > 0 && d.email.size() <= 200
+      && d.email.matches('^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$')
+      && d.active == true
+      && d.minDiameterCm is number && d.minDiameterCm >= 0 && d.minDiameterCm <= 1000
+      && d.radiusM is number && d.radiusM >= 0 && d.radiusM <= 10000
+      && d.species is list && d.species.size() <= 60
+      && d.reasons is list && d.reasons.size() <= 30
+      && d.districts is list && d.districts.size() <= 8
+      && d.homeAddress is string && d.homeAddress.size() <= 300
+      && (d.homeLat == null || (d.homeLat is number && d.homeLat >= -90 && d.homeLat <= 90))
+      && (d.homeLng == null || (d.homeLng is number && d.homeLng >= -180 && d.homeLng <= 180))
+      && d.createdAt is string && d.createdAt.size() <= 40
+      && d.lastNotifiedLoaNr is number && d.lastNotifiedLoaNr >= 0;
+    }
+
+    match /subscriptions/{token} {
+      // Document id is an unguessable token (crypto.randomUUID()), not an
+      // auto-id — knowing it is treated as proof of ownership. "get" (fetch
+      // by exact id) is fine; "list" must stay closed or anyone could
+      // enumerate every subscriber's email/address by scanning the collection.
+      allow get: if true;
+      allow list: if false;
+      allow create: if isValidSubscription(request.resource.data);
+      // The only write the client ever needs after create is "cancel" —
+      // flipping active true -> false. Anything else (changing email,
+      // criteria, re-activating) is rejected even by someone holding the token.
+      allow update: if resource.data.active == true
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['active'])
+                    && request.resource.data.active == false;
       allow delete: if false;
     }
     match /{document=**} {
