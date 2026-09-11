@@ -140,14 +140,16 @@
       row.innerHTML = `<div class="meta">${escapeHtml(d.email)} &middot; ${d.active?'Aktiivne':'Peatatud'} &middot; ${bits.join(' &middot; ') || 'kõik load'}</div>`;
       const btn = document.createElement('button');
       btn.className = 'ghost-btn';
-      btn.textContent = d.active ? 'Tühista tellimus' : 'Tühistatud';
-      btn.disabled = !d.active;
+      btn.textContent = 'Kustuta tellimus';
       btn.addEventListener('click', async ()=>{
-        btn.disabled = true; btn.textContent = 'Tühistan…';
+        btn.disabled = true; btn.textContent = 'Kustutan…';
         try{
-          await doc.ref.update({active:false});
-          btn.textContent = 'Tühistatud';
-          row.querySelector('.meta').innerHTML = row.querySelector('.meta').innerHTML.replace('Aktiivne','Peatatud');
+          // Tühistamine kustutab tellimuse dokumendi täielikult (e-post, kriteeriumid,
+          // kodu-aadress) — ei jäta seda alles "peatatud" olekus, vt tellimisvormi
+          // andmekaitse teadet ja firestore.rules.txt (allow delete: if true).
+          await doc.ref.delete();
+          btn.remove();
+          row.querySelector('.meta').textContent = `${d.email} — tellimus ja sellega seotud andmed on kustutatud.`;
         }catch(e){ btn.disabled = false; btn.textContent = 'Viga, proovi uuesti'; }
       });
       row.appendChild(btn);

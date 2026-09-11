@@ -38,13 +38,11 @@ service cloud.firestore {
       allow get: if true;
       allow list: if false;
       allow create: if isValidSubscription(request.resource.data);
-      // The only write the client ever needs after create is "cancel" —
-      // flipping active true -> false. Anything else (changing email,
-      // criteria, re-activating) is rejected even by someone holding the token.
-      allow update: if resource.data.active == true
-                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['active'])
-                    && request.resource.data.active == false;
-      allow delete: if false;
+      // "Cancel" deletes the document outright (right-to-erasure: the email
+      // and criteria are actually removed, not just flagged inactive) — so
+      // there is no legitimate client-side update left; only get/create/delete.
+      allow update: if false;
+      allow delete: if true;
     }
     match /{document=**} {
       allow read: if true;
