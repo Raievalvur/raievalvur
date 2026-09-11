@@ -209,17 +209,55 @@ function matchesSubscription(sub, permit) {
   return true;
 }
 
-// ---------- E-posti saatmine (Gmail SMTP) ----------
+// ---------- E-posti saatmine (Zone.eu SMTP) ----------
 function buildTransporter() {
-  const user = process.env.GMAIL_USER;
-  const pass = process.env.GMAIL_APP_PASSWORD;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASSWORD;
   if (!user || !pass) return null;
-  return nodemailer.createTransport({ service: 'gmail', auth: { user, pass } });
+  const host = process.env.SMTP_HOST || 'smtp.zone.eu';
+  const port = parseInt(process.env.SMTP_PORT || '465', 10);
+  return nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465, // port 465 = otsene TLS; port 587 kasutaks STARTTLS-i (secure:false)
+    auth: { user, pass },
+  });
 }
 
 function permitToLine(p) {
   const trees = p.species.length ? p.species.join(', ') : '—';
   return `${p.address || '—'} (${p.district || 'linnaosa teadmata'}) — ${trees}, ${p.permitTypes.join(', ') || '—'}${p.valueClass ? `, väärtusklass ${p.valueClass}` : ''}\n${p.detailUrl}`;
+}
+
+function describeSubscription(sub) {
+  const bits = [];
+  if (sub.species && sub.species.length) bits.push(`Puuliigid: ${sub.species.join(', ')}`);
+  if (sub.reasons && sub.reasons.length) bits.push(`Põhjused: ${sub.reasons.join(', ')}`);
+  if (sub.districts && sub.districts.length) bits.push(`Linnaosad: ${sub.districts.join(', ')}`);
+  if (sub.minDiameterCm) bits.push(`Läbimõõt alates ${sub.minDiameterCm} cm`);
+  if (sub.radiusM && sub.homeAddress) bits.push(`Raadius ${sub.radiusM} m aadressist "${sub.homeAddress}"`);
+  return bits.length ? bits.join('\n') : 'Kõik uued otsused (ühtegi filtrit ei valitud).';
+}
+
+async function sendWelcomeEmail(transporter, toEmail, sub, manageLink) {
+  const body = [
+    'Tere,',
+    '',
+    'Sinu Raievalvuri tellimus on loodud. Saad e-kirja, kui uus otsus vastab järgnevatele tingimustele:',
+    '',
+    describeSubscription(sub),
+    '',
+    'Tellimuse haldamiseks (peatamiseks) ava:',
+    manageLink,
+    '',
+    APP_URL,
+  ].join('\n');
+  await transporter.sendMail({
+    from: `Raievalvur <${process.env.SMTP_USER}>`,
+    to: toEmail,
+    subject: 'Raievalvur: tellimus on kinnitatud',
+    text: body,
+  });
 }
 
 async function sendDigestEmail(transporter, toEmail, permits, manageLink) {
@@ -239,7 +277,7 @@ async function sendDigestEmail(transporter, toEmail, permits, manageLink) {
     APP_URL,
   ].join('\n');
   await transporter.sendMail({
-    from: `Raievalvur <${process.env.GMAIL_USER}>`,
+    from: `Raievalvur <${process.env.SMTP_USER}>`,
     to: toEmail,
     subject,
     text: body,
@@ -263,66 +301,78 @@ async function main() {
   }
   console.log(`Neist uusi (Firestore's veel pole): ${newRows.length}.`);
 
+  const newPermits = [];
   if (!newRows.length) {
     await db.doc('state/sync').set({ lastRunAt: now, lastCheckedCount: listRows.length }, { merge: true });
-    console.log('Uusi otsuseid ei leitud. Lopetan.');
-    return;
-  }
-
-  const newPermits = [];
-  for (const row of newRows) {
-    try {
-      const detail = await fetchDetail(row.detailId);
-      const geo = await geocodeAddress(detail.address);
-      const permit = {
-        loaNr: row.loaNr,
-        district: detail.district,
-        address: detail.address,
-        decision: detail.decision,
-        decidedAt: detail.decidedAt,
-        validUntil: detail.validUntil,
-        detailUrl: detail.detailUrl,
-        permitTypes: detail.permitTypes,
-        species: detail.species,
-        maxDiameterCm: detail.maxDiameterCm,
-        valueClass: detail.valueClass,
-        lat: geo ? geo[0] : null,
-        lng: geo ? geo[1] : null,
-      };
-      await db.collection('permits').doc(row.loaNr).set(permit);
-      newPermits.push(permit);
-      console.log(`Lisatud: ${row.loaNr} — ${permit.address}`);
-    } catch (e) {
-      console.error(`Viga loa ${row.loaNr} tootlemisel:`, e.message);
+    console.log('Uusi otsuseid ei leitud.');
+  } else {
+    for (const row of newRows) {
+      try {
+        const detail = await fetchDetail(row.detailId);
+        const geo = await geocodeAddress(detail.address);
+        const permit = {
+          loaNr: row.loaNr,
+          district: detail.district,
+          address: detail.address,
+          decision: detail.decision,
+          decidedAt: detail.decidedAt,
+          validUntil: detail.validUntil,
+          detailUrl: detail.detailUrl,
+          permitTypes: detail.permitTypes,
+          species: detail.species,
+          maxDiameterCm: detail.maxDiameterCm,
+          valueClass: detail.valueClass,
+          lat: geo ? geo[0] : null,
+          lng: geo ? geo[1] : null,
+        };
+        await db.collection('permits').doc(row.loaNr).set(permit);
+        newPermits.push(permit);
+        console.log(`Lisatud: ${row.loaNr} — ${permit.address}`);
+      } catch (e) {
+        console.error(`Viga loa ${row.loaNr} tootlemisel:`, e.message);
+      }
     }
-  }
 
-  const maxLoaNr = Math.max(...newPermits.map((p) => parseInt(p.loaNr, 10)).filter((n) => !isNaN(n)), 0);
-  const syncSnap = await db.doc('state/sync').get();
-  const prevMax = parseInt((syncSnap.data() || {}).lastLoaNr || 0, 10) || 0;
-  await db.doc('state/sync').set(
-    {
-      lastRunAt: now,
-      lastCheckedCount: listRows.length,
-      lastNewCount: newPermits.length,
-      lastLoaNr: Math.max(prevMax, maxLoaNr),
-    },
-    { merge: true }
-  );
+    const maxLoaNr = Math.max(...newPermits.map((p) => parseInt(p.loaNr, 10)).filter((n) => !isNaN(n)), 0);
+    const syncSnap = await db.doc('state/sync').get();
+    const prevMax = parseInt((syncSnap.data() || {}).lastLoaNr || 0, 10) || 0;
+    await db.doc('state/sync').set(
+      {
+        lastRunAt: now,
+        lastCheckedCount: listRows.length,
+        lastNewCount: newPermits.length,
+        lastLoaNr: Math.max(prevMax, maxLoaNr),
+      },
+      { merge: true }
+    );
+  }
 
   // ---- Teavitused ----
+  // See plokk jookseb iga tunni tagant soltumata sellest, kas seekord leiti
+  // uusi lube — vastasel juhul voiks tervituskiri hiljutisele tellijale
+  // viibida palju rohkem kui tund, kui portaal parajasti vaikib.
   const transporter = buildTransporter();
   if (!transporter) {
-    console.warn('GMAIL_USER / GMAIL_APP_PASSWORD puudub — e-kirju ei saadeta.');
+    console.warn('SMTP_USER / SMTP_PASSWORD puudub — e-kirju ei saadeta.');
   } else {
     const subsSnap = await db.collection('subscriptions').where('active', '==', true).get();
     console.log(`Aktiivseid tellimusi: ${subsSnap.size}.`);
     for (const subDoc of subsSnap.docs) {
       const sub = subDoc.data();
+      const manageLink = `${APP_URL}?manage=${subDoc.id}`;
+      try {
+        if (!sub.welcomeSent) {
+          await sendWelcomeEmail(transporter, sub.email, sub, manageLink);
+          await subDoc.ref.update({ welcomeSent: true });
+          console.log(`Tervituskiri saadetud: ${sub.email}`);
+        }
+      } catch (e) {
+        console.error(`Tervituskirja saatmine ebaonnestus (${sub.email}):`, e.message);
+      }
+      if (!newPermits.length) continue;
       try {
         const matches = newPermits.filter((p) => matchesSubscription(sub, p));
         if (!matches.length) continue;
-        const manageLink = `${APP_URL}?manage=${subDoc.id}`;
         await sendDigestEmail(transporter, sub.email, matches, manageLink);
         const maxMatched = Math.max(...matches.map((p) => parseInt(p.loaNr, 10)).filter((n) => !isNaN(n)), 0);
         await subDoc.ref.update({ lastNotifiedLoaNr: Math.max(parseInt(sub.lastNotifiedLoaNr || 0, 10), maxMatched) });
