@@ -22,7 +22,7 @@ const admin = require('firebase-admin');
 const nodemailer = require('nodemailer');
 
 const BASE_URL = 'https://raie.tallinn.ee';
-const APP_URL = 'https://airport4.github.io/raievalvur/';
+const APP_URL = 'https://raievalvur.ee/';
 const LIST_LIMIT = parseInt(process.env.LIST_LIMIT || '100', 10);
 const DISTRICTS = ['Haabersti', 'Kesklinn', 'Kristiine', 'Lasnamäe', 'Mustamäe', 'Nõmme', 'Pirita', 'Põhja-Tallinn'];
 const ROMAN_ORDER = { I: 1, II: 2, III: 3, IV: 4, V: 5 };
@@ -43,7 +43,7 @@ async function fetchText(url, timeoutMs = 20000) {
   try {
     const res = await fetch(url, {
       signal: ctrl.signal,
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; RaievalvurBot/1.0; +https://airport4.github.io/raievalvur/)' },
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; RaievalvurBot/1.0; +https://raievalvur.ee/)' },
     });
     if (!res.ok) throw new Error(`HTTP ${res.status} otsimisel ${url}`);
     return await res.text();
